@@ -1,0 +1,216 @@
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib import patches
+
+def calculateur_succession():
+    # Saisie des informations sur la succession
+    print("=== CALCULATEUR DE LIQUIDATION DE SUCCESSION ===")
+    print("\n1. INFORMATIONS SUR LA SUCCESSION")
+    actif_net = float(input("Actif net de la succession (€): "))
+    passif = float(input("Passif (dettes, charges) (€): "))
+    assurance_vie = float(input("Montant de l'assurance-vie (€): "))
+    
+    # Saisie des héritiers
+    print("\n2. INFORMATIONS SUR LES HÉRITIERS")
+    heritiers = {}
+    
+    # Enfants
+    nb_enfants = int(input("Nombre d'enfants du défunt: "))
+    if nb_enfants > 0:
+        for i in range(nb_enfants):
+            age = int(input(f"Âge de l'enfant {i+1}: "))
+            heritiers[f"Enfant {i+1}"] = {"lien": "enfant", "age": age, "part": 0, "abattement": 100000, "droits": 0, "net": 0}
+    
+    # Conjoint survivant
+    conjoint = input("Y a-t-il un conjoint survivant? (o/n): ").lower() == 'o'
+    if conjoint:
+        heritiers["Conjoint"] = {"lien": "conjoint", "age": 0, "part": 0, "abattement": 0, "droits": 0, "net": 0}
+    
+    # Parents
+    pere = input("Le père est-il vivant? (o/n): ").lower() == 'o'
+    mere = input("La mère est-elle vivante? (o/n): ").lower() == 'o'
+    if pere:
+        heritiers["Père"] = {"lien": "parent", "age": 0, "part": 0, "abattement": 100000, "droits": 0, "net": 0}
+    if mere:
+        heritiers["Mère"] = {"lien": "parent", "age": 0, "part": 0, "abattement": 100000, "droits": 0, "net": 0}
+    
+    # Frères et sœurs
+    nb_freres = int(input("Nombre de frères et sœurs: "))
+    if nb_freres > 0:
+        for i in range(nb_freres):
+            heritiers[f"Frère/Soeur {i+1}"] = {"lien": "frere_soeur", "age": 0, "part": 0, "abattement": 15932, "droits": 0, "net": 0}
+    
+    # Calcul de la succession
+    print("\n3. CALCUL DE LA LIQUIDATION")
+    
+    # Répartition de la succession
+    masse_partageable = actif_net - passif
+    part_assurance_vie = assurance_vie
+    
+    # Règles de dévolution légale
+    if nb_enfants > 0:
+        if conjoint:
+            # Conjoint a le choix entre 1/4 en pleine propriété ou usufruit de la totalité
+            part_conjoint = masse_partageable / 4
+            part_enfants = masse_partageable - part_conjoint
+            part_par_enfant = part_enfants / nb_enfants
+            heritiers["Conjoint"]["part"] = part_conjoint
+            
+            for i in range(nb_enfants):
+                heritiers[f"Enfant {i+1}"]["part"] = part_par_enfant
+        else:
+            # Tout aux enfants
+            part_par_enfant = masse_partageable / nb_enfants
+            for i in range(nb_enfants):
+                heritiers[f"Enfant {i+1}"]["part"] = part_par_enfant
+    else:
+        if conjoint:
+            part_conjoint = masse_partageable
+            heritiers["Conjoint"]["part"] = part_conjoint
+        else:
+            # En l'absence d'enfants et de conjoint
+            if pere or mere:
+                part_parents = masse_partageable / 2 if (pere and mere) else masse_partageable
+                if pere:
+                    heritiers["Père"]["part"] = part_parents / 2 if mere else part_parents
+                if mere:
+                    heritiers["Mère"]["part"] = part_parents / 2 if pere else part_parents
+                
+                # Le reste aux frères et sœurs s'il y en a
+                if nb_freres > 0:
+                    part_freres = masse_partageable / 2 if (pere and mere) else 0
+                    part_par_frere = part_freres / nb_freres if nb_freres > 0 else 0
+                    for i in range(nb_freres):
+                        heritiers[f"Frère/Soeur {i+1}"]["part"] = part_par_frere
+            else:
+                # Aux frères et sœurs
+                if nb_freres > 0:
+                    part_par_frere = masse_partageable / nb_freres
+                    for i in range(nb_freres):
+                        heritiers[f"Frère/Soeur {i+1}"]["part"] = part_par_frere
+    
+    # Calcul des droits de succession
+    for heritier, details in heritiers.items():
+        part = details["part"]
+        abattement = details["abattement"]
+        base_taxable = max(0, part - abattement)
+        
+        if details["lien"] == "enfant":
+            # Barème 2023 pour les enfants
+            if base_taxable <= 8072:
+                taux = 0.05
+            elif base_taxable <= 12109:
+                taux = 0.10
+            elif base_taxable <= 15932:
+                taux = 0.15
+            elif base_taxable <= 552324:
+                taux = 0.20
+            elif base_taxable <= 902838:
+                taux = 0.30
+            elif base_taxable <= 1805677:
+                taux = 0.40
+            else:
+                taux = 0.45
+                
+        elif details["lien"] == "parent":
+            # Même barème que les enfants pour les parents
+            if base_taxable <= 8072:
+                taux = 0.05
+            elif base_taxable <= 12109:
+                taux = 0.10
+            elif base_taxable <= 15932:
+                taux = 0.15
+            elif base_taxable <= 552324:
+                taux = 0.20
+            elif base_taxable <= 902838:
+                taux = 0.30
+            elif base_taxable <= 1805677:
+                taux = 0.40
+            else:
+                taux = 0.45
+                
+        elif details["lien"] == "frere_soeur":
+            if base_taxable <= 24430:
+                taux = 0.35
+            else:
+                taux = 0.45
+                
+        elif details["lien"] == "conjoint":
+            taux = 0  # Exonération totale pour le conjoint
+            
+        details["droits"] = base_taxable * taux
+        details["net"] = part - details["droits"]
+    
+    # Affichage des résultats
+    print("\n4. RÉSULTATS DE LA LIQUIDATION")
+    print(f"Masse partageable: {masse_partageable:,.2f} €")
+    print(f"Assurance-vie: {assurance_vie:,.2f} € (hors succession)")
+    print("\nDétail par héritier:")
+    
+    for heritier, details in heritiers.items():
+        print(f"{heritier}: Part = {details['part']:,.2f} €, Abattement = {details['abattement']:,.2f} €, "
+              f"Droits = {details['droits']:,.2f} €, Net = {details['net']:,.2f} €")
+    
+    # Diagramme de la succession
+    dessiner_diagramme(heritiers, masse_partageable)
+
+def dessiner_diagramme(heritiers, masse_partageable):
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 7))
+    
+    # Diagramme circulaire de la répartition
+    labels = []
+    parts = []
+    colors = plt.cm.Set3(np.linspace(0, 1, len(heritiers)))
+    
+    for heritier, details in heritiers.items():
+        if details["part"] > 0:
+            labels.append(f"{heritier}\n{details['part']:,.0f} €")
+            parts.append(details["part"])
+    
+    wedges, texts, autotexts = ax1.pie(parts, labels=labels, autopct='%1.1f%%', colors=colors,
+                                       startangle=90)
+    ax1.set_title('Répartition de la succession', fontweight='bold')
+    
+    # Diagramme à barres des parts nettes
+    noms = []
+    nets = []
+    droits = []
+    parts_brutes = []
+    
+    for heritier, details in heritiers.items():
+        if details["part"] > 0:
+            noms.append(heritier)
+            nets.append(details["net"])
+            droits.append(details["droits"])
+            parts_brutes.append(details["part"])
+    
+    x = range(len(noms))
+    bar_width = 0.35
+    
+    ax2.bar(x, parts_brutes, bar_width, label='Part brute', color='lightblue')
+    ax2.bar(x, nets, bar_width, label='Part nette', color='lightgreen')
+    ax2.bar([i + bar_width for i in x], droits, bar_width, label='Droits de succession', color='salmon')
+    
+    ax2.set_xlabel('Héritiers')
+    ax2.set_ylabel('Montant (€)')
+    ax2.set_title('Parts brute et nette par héritier', fontweight='bold')
+    ax2.set_xticks([i + bar_width / 2 for i in x])
+    ax2.set_xticklabels(noms, rotation=45, ha='right')
+    ax2.legend()
+    
+    # Résumé chiffré
+    total_droits = sum([details["droits"] for details in heritiers.values()])
+    total_net = sum([details["net"] for details in heritiers.values()])
+    
+    plt.figtext(0.5, 0.01, 
+                f"Résumé: Masse partageable = {masse_partageable:,.2f} € | "
+                f"Total droits = {total_droits:,.2f} € | "
+                f"Total net aux héritiers = {total_net:,.2f} €", 
+                ha="center", fontsize=12, bbox={"facecolor":"orange", "alpha":0.2, "pad":5})
+    
+    plt.tight_layout(rect=[0, 0.05, 1, 0.95])
+    plt.show()
+
+# Exécution du calculateur
+if __name__ == "__main__":
+    calculateur_succession()
